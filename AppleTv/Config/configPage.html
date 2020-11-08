@@ -1,0 +1,106 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>AppleTv</title>
+</head>
+<body>
+<!-- ReSharper disable UnknownCssClass -->
+<div id="ConfigurationPage" data-role="page" class="page type-interior pluginConfigurationPage ConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+    <div data-role="content">
+        <div class="content-primary">
+
+            <h1>Channel Setup</h1>
+
+            <form id="ConfigurationForm">
+                <div class="inputContainer">
+                    <input is="emby-input" id="txtPin" name="txtPin" type="text" label="Trakt Authentication PIN:" />
+                    <div class="fieldDescription">
+                        <a href="https://trakt.tv/oauth/authorize?response_type=code&client_id=c44548028dcd8f31e9bee55318562e6e5deb8524f5ca3e77e167fd3b1c9ce380&redirect_uri=urn:ietf:wg:oauth:2.0:oob" target="_blank">Get PIN.</a> When the PIN is successfully exchanged for a token, it is deleted from this field. Afterwards, the hidden token is used.
+                    </div>
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" id="txtChannelName" name="txtChannelName" type="text" label="Label For Channel Shown in Emby:" />                   
+                </div>
+                <!--<div class="inputContainer">
+                    <input is="emby-input" id="txtTraktListUserName" name="txtTraktListUserName" type="text" label="Trakt List Users Name:" />                    
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" id="txtTraktListName" name="txtTraktListName" type="text" label="Trakt List Name:" />                   
+                </div>-->                     
+                <div>
+                    <button is="emby-button" type="submit" class="raised button-submit block"><span>${ButtonSave}</span></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ReSharper disable UseOfImplicitGlobalInFunctionScope -->
+    <script type="text/javascript">
+
+        Array.prototype.remove = function () {
+            var what, a = arguments, L = a.length, ax;
+            while (L && this.length) {
+                what = a[--L];
+                while ((ax = this.indexOf(what)) !== -1) {
+                    this.splice(ax, 1);
+                }
+            }
+            return this;
+        };
+
+        var ConfigurationPage =
+            {
+                pluginUniqueId: "0BDD1CFA-0234-439B-82D6-D8DFE3075347",
+                loadConfiguration: function (page) {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(ConfigurationPage.pluginUniqueId).then(function (config) {
+                        if (config.Pin) {
+                            $('#txtPin', page).val(config.Pin);
+                        }
+                        if (config.ChannelName) {
+                            $('#txtChannelName', page).val(config.ChannelName);
+                        }
+                        /*if (config.TraktListUserName) {
+                            $('#txtTraktListUserName', page).val(config.TraktListUserName);
+                        }
+                        if (config.TraktListName) {
+                            $('#txtTraktListName', page).val(config.TraktListName);
+                        }*/
+                        Dashboard.hideLoadingMsg();
+                    });
+                }
+            };
+
+        $('.ConfigurationPage').on('pageinit', function () {
+            Dashboard.showLoadingMsg();
+            var page = this;
+            $('#ConfigurationForm', page).on('submit', function () {
+                Dashboard.showLoadingMsg();
+                
+                ApiClient.getPluginConfiguration(ConfigurationPage.pluginUniqueId).then(function (config) {                    
+                    config.Pin = $('#txtPin', page).val();
+                    config.ChannelName = $('#txtChannelName', page).val();
+                    /*config.TraktListUserName = $('#txtTraktListUserName', page).val();
+                    config.TraktListName = $('#txtTraktListName', page).val();*/                
+                   
+                    ApiClient.updatePluginConfiguration(ConfigurationPage.pluginUniqueId, config).then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                        Dashboard.alert('Settings saved.');                        
+                    });
+                });
+                return false;
+            });
+        });
+        
+        $('.ConfigurationPage').on('pageshow', function () {
+            Dashboard.showLoadingMsg();
+            var page = this;
+            ConfigurationPage.loadConfiguration(page);            
+        });
+    </script>
+    <!-- ReSharper restore UseOfImplicitGlobalInFunctionScope -->
+
+</div>
+<!-- ReSharper restore UnknownCssClass -->
+</body>
+</html>
