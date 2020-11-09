@@ -63,6 +63,16 @@ namespace AppleTv
         
         private async Task<ChannelItemResult> GetChannelItemsInternal()
         {
+            var newItems = new List<ChannelItemInfo>();
+            
+            if (string.IsNullOrEmpty(Plugin.Instance.PluginConfiguration.Pin) && string.IsNullOrEmpty(Plugin.Instance.PluginConfiguration.TraktUser.AccessToken))
+            {
+                return await Task.FromResult(new ChannelItemResult
+                {
+                    Items = newItems.ToList()
+                }); 
+            }
+            
             var config = Plugin.Instance.Configuration;
             var channel = LibraryManager.GetItemList(new InternalItemsQuery()
             {
@@ -89,26 +99,74 @@ namespace AppleTv
             
             Logger.Info($"Count of items on list {listData.Count}");
 
-            // ReSharper disable once ComplexConditionExpression
-            var sortedList = ids.Where(i => !libraryItems.Exists(id => id == i)).ToList();
-
-            var items = sortedList.Select(id => LibraryManager.GetItemById(id))
-                .Select(movie => new ChannelItemInfo
+             var mediaItems =
+                LibraryManager.GetItemList(
+                        new InternalItemsQuery()
+                        {
+                            IncludeItemTypes = new[] {nameof(Movie)},
+                            IsVirtualItem = false,
+                            OrderBy = new[]
+                            {
+                                new ValueTuple<string, SortOrder>(ItemSortBy.SeriesSortName, SortOrder.Ascending),
+                                new ValueTuple<string, SortOrder>(ItemSortBy.SortName, SortOrder.Ascending)
+                            }
+                        })
+                    .ToList();
+                
+            Logger.Info($"Count of items in emby {mediaItems.Count}");
+            
+            foreach (var movie in mediaItems.OfType<Movie>())
+            {
+                //Logger.Info($"Movie {movie.Name}");
+                
+                if (libraryItems.Contains(movie.InternalId))
                 {
-                    Name          = movie.Name,
-                    ImageUrl      = movie.PrimaryImagePath,
-                    Id            = movie.Id.ToString(),
-                    Type          = ChannelItemType.Media,
-                    ContentType   = ChannelMediaContentType.Movie,
-                    MediaType     = ChannelMediaType.Video,
-                    IsLiveStream  = false,
-                    MediaSources  = new List<MediaSourceInfo> {new ChannelMediaInfo {Path = movie.Path, Protocol = MediaProtocol.File}.ToMediaSource()},
-                    OriginalTitle = movie.OriginalTitle
-                });
+                    continue;
+                }
+                
+                var foundMovie = Match.FindMatch(movie, listData);
+
+                if (foundMovie != null)
+                {
+                    //Logger.Info($"Movie {movie.Name} found");
+
+                    var embyMove = LibraryManager.GetItemById(movie.Id);
+                    if (embyMove != null)
+                    {
+                        Logger.Info($"Emby Movie {embyMove}");
+                           // if(string.IsNullOrEmpty(embyMove.Path)){
+                                var newMovie = new ChannelItemInfo
+                                {
+                                    Name = embyMove.Name,
+                                    ImageUrl = embyMove.PrimaryImagePath,
+                                    Id = embyMove.Id.ToString(),
+                                    Type = ChannelItemType.Media,
+                                    ContentType = ChannelMediaContentType.Movie,
+                                    MediaType = ChannelMediaType.Video,
+                                    IsLiveStream = false,
+                                    MediaSources = new List<MediaSourceInfo>
+                                    {
+                                        new ChannelMediaInfo
+                                            {Path = embyMove.Path, Protocol = MediaProtocol.File}.ToMediaSource()
+                                    },
+                                    OriginalTitle = embyMove.OriginalTitle
+                                };
+                                newItems.Add(newMovie);
+                           // }
+                    }
+                }
+                else
+                {
+                    //Logger.Debug($"Movie {movie.Name} not found");
+                }
+            }
+                
+            Logger.Info($"Count of items in List to add {newItems.Count}");
+            
 
             return await Task.FromResult(new ChannelItemResult
             {
-                Items = items.ToList()
+                Items = newItems.ToList()
             });
         }
 

@@ -62,17 +62,21 @@ namespace AppleTv.Helpers
 
         public static bool IsMatch(BaseItem item, TraktMovie movie)
         {
+            if (movie == null)
+            {
+                return false;
+            }
             var imdb = item.GetProviderId(MetadataProviders.Imdb);
 
-            if (!String.IsNullOrWhiteSpace(imdb) &&
-                String.Equals(imdb, movie.ids.imdb, StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(imdb) && 
+                string.Equals(imdb, movie?.ids.imdb, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
             var tmdb = item.GetProviderId(MetadataProviders.Tmdb);
 
-            if (movie.ids.tmdb.HasValue && String.Equals(tmdb, movie.ids.tmdb.Value.ToString(CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(tmdb) && movie.ids.tmdb.HasValue && string.Equals(tmdb, movie.ids.tmdb.Value.ToString(CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
