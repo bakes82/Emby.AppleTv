@@ -19,14 +19,14 @@
                     </div>
                 </div>
                 <div class="inputContainer">
-                    <input is="emby-input" id="txtChannelName" name="txtChannelName" type="text" label="Label For Channel Shown in Emby:" />                   
+                    <input is="emby-input" id="txtChannelName" name="txtChannelName" type="text" label="Label For Channel Shown in Emby:" />
                 </div>
-                <!--<div class="inputContainer">
-                    <input is="emby-input" id="txtTraktListUserName" name="txtTraktListUserName" type="text" label="Trakt List Users Name:" />                    
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="chkEnabled" name="chkEnabled" />
+                        <span>Enable Channel</span>
+                    </label>
                 </div>
-                <div class="inputContainer">
-                    <input is="emby-input" id="txtTraktListName" name="txtTraktListName" type="text" label="Trakt List Name:" />                   
-                </div>-->                     
                 <div>
                     <button is="emby-button" type="submit" class="raised button-submit block"><span>${ButtonSave}</span></button>
                 </div>
@@ -60,6 +60,10 @@
                         if (config.ChannelName) {
                             $('#txtChannelName', page).val(config.ChannelName);
                         }
+                        if(config.Enabled)
+                        {
+                            page.querySelector('#chkEnabled').checked = config.ChannelName;
+                        }
                         /*if (config.TraktListUserName) {
                             $('#txtTraktListUserName', page).val(config.TraktListUserName);
                         }
@@ -76,26 +80,27 @@
             var page = this;
             $('#ConfigurationForm', page).on('submit', function () {
                 Dashboard.showLoadingMsg();
-                
-                ApiClient.getPluginConfiguration(ConfigurationPage.pluginUniqueId).then(function (config) {                    
+
+                ApiClient.getPluginConfiguration(ConfigurationPage.pluginUniqueId).then(function (config) {
                     config.Pin = $('#txtPin', page).val();
                     config.ChannelName = $('#txtChannelName', page).val();
+                    config.Enabled = page.querySelector('#chkEnabled').checked;
                     /*config.TraktListUserName = $('#txtTraktListUserName', page).val();
-                    config.TraktListName = $('#txtTraktListName', page).val();*/                
-                   
+                    config.TraktListName = $('#txtTraktListName', page).val();*/
+
                     ApiClient.updatePluginConfiguration(ConfigurationPage.pluginUniqueId, config).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);
-                        Dashboard.alert('Settings saved.');                        
+                        Dashboard.alert('Settings saved.');
                     });
                 });
                 return false;
             });
         });
-        
+
         $('.ConfigurationPage').on('pageshow', function () {
             Dashboard.showLoadingMsg();
             var page = this;
-            ConfigurationPage.loadConfiguration(page);            
+            ConfigurationPage.loadConfiguration(page);
         });
     </script>
     <!-- ReSharper restore UseOfImplicitGlobalInFunctionScope -->

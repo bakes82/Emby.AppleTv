@@ -28,16 +28,17 @@ namespace AppleTv
         private ILogger Logger                 { get; }
         private IJsonSerializer JsonSerializer { get; }
         private ILibraryManager LibraryManager { get; }
-        
+        private IUserManager UserManager { get; }
         private TraktApi TraktApi { get; }
 
-        public Channel(IHttpClient httpClient, ILogManager logManager, IJsonSerializer jsonSerializer, ILibraryManager lib, TraktApi traktApi)
+        public Channel(IHttpClient httpClient, ILogManager logManager, IJsonSerializer jsonSerializer, ILibraryManager lib, TraktApi traktApi, IUserManager userManager)
         {
             HttpClient     = httpClient;
             Logger         = logManager.GetLogger(GetType().Name);
             JsonSerializer = jsonSerializer;
             LibraryManager = lib;
             TraktApi = traktApi;
+            UserManager = userManager;
         }
 
         public string DataVersion => "12";
@@ -63,7 +64,111 @@ namespace AppleTv
         
         private async Task<ChannelItemResult> GetChannelItemsInternal()
         {
+            var users = UserManager.Users;
+
+            var channels = LibraryManager.GetItemList(new InternalItemsQuery()
+            {
+                Recursive = true,
+                IncludeItemTypes = new []{ "Channel" }
+            }).Where(x => !string.IsNullOrEmpty(x.Name)).ToList();
+
+            var currentChannel = channels.First(x => x.Name == Plugin.Instance.PluginConfiguration.ChannelName).Id.ToString().Replace("-", string.Empty);
+            
+            if (!Plugin.Instance.PluginConfiguration.Enabled)
+            {
+                foreach (var user in users)
+                {
+                    user.Policy.EnableAllChannels = false;
+
+                    var enabledChannels = user.Policy.EnabledChannels != null ? user.Policy.EnabledChannels.ToList() : new List<string>();
+                    var disabledChannels = user.Policy.BlockedChannels != null ? user.Policy.BlockedChannels.ToList() : new List<string>();
+                    
+                    //Logger.Info("Enabled " + string.Join(",", enabledChannels.Select(x => x.ToString()).ToArray()));
+                    //Logger.Info("Blocked " + string.Join(",", disabledChannels.Select(x => x.ToString()).ToArray()));
+
+                    if (!disabledChannels.Contains(currentChannel))
+                    {
+                        disabledChannels.Add(currentChannel);
+                        //Logger.Info("Added To Disabled " + currentChannel);
+                    }
+
+                    if (enabledChannels.Any())
+                    {
+                        if (enabledChannels.Contains(currentChannel))
+                        {
+                            enabledChannels.Remove(currentChannel);
+                        }
+                    }
+                    else
+                    {
+                        foreach (var channel in channels.Where(x => x.Name != Plugin.Instance.PluginConfiguration.ChannelName))
+                        {
+                            enabledChannels.Add(channel.Id.ToString().Replace("-", string.Empty));
+                        }
+                    }
+
+                    user.Policy.EnabledChannels = enabledChannels.ToArray();
+                    user.Policy.BlockedChannels = disabledChannels.ToArray();
+                    
+                    //Logger.Info("Enabled " + string.Join(",", enabledChannels.Select(x => x.ToString()).ToArray()));
+                    //Logger.Info("Blocked " + string.Join(",", disabledChannels.Select(x => x.ToString()).ToArray()));
+
+                    UserManager.UpdateUser(user);
+                }
+            }
+            else
+            {
+                foreach (var user in users)
+                {
+                    user.Policy.EnableAllChannels = false;
+
+                    var enabledChannels = user.Policy.EnabledChannels != null ? user.Policy.EnabledChannels.ToList() : new List<string>();
+                    var disabledChannels = user.Policy.BlockedChannels != null ? user.Policy.BlockedChannels.ToList() : new List<string>();
+                    
+                    //Logger.Info("Enabled " + string.Join(",", enabledChannels.Select(x => x.ToString()).ToArray()));
+                    //Logger.Info("Blocked " + string.Join(",", disabledChannels.Select(x => x.ToString()).ToArray()));
+
+                    if (disabledChannels.Contains(currentChannel))
+                    {
+                        disabledChannels.Remove(currentChannel);
+                    }
+                    
+                    if (enabledChannels.Any())
+                    {
+                        if (enabledChannels.Contains(currentChannel))
+                        {
+                            continue;
+                        }
+
+                        enabledChannels.Add(currentChannel);
+                    }
+                    else
+                    {
+                        foreach (var channel in channels)
+                        {
+                            enabledChannels.Add(channel.Id.ToString().Replace("-", string.Empty));
+                        }
+                    }
+
+                    user.Policy.EnabledChannels = enabledChannels.ToArray();
+                    user.Policy.BlockedChannels = disabledChannels.ToArray();
+                    
+                    //Logger.Info("Enabled " + string.Join(",", enabledChannels.Select(x => x.ToString()).ToArray()));
+                    //Logger.Info("Blocked " + string.Join(",", disabledChannels.Select(x => x.ToString()).ToArray()));
+
+                    UserManager.UpdateUser(user);
+                }
+            }
+
             var newItems = new List<ChannelItemInfo>();
+
+            if (Plugin.Instance.PluginConfiguration.Enabled == false)
+            {
+                return await Task.FromResult(new ChannelItemResult
+                {
+                    Items = newItems.ToList()
+                }); 
+            }
             
             if (string.IsNullOrEmpty(Plugin.Instance.PluginConfiguration.Pin) && string.IsNullOrEmpty(Plugin.Instance.PluginConfiguration.TraktUser.AccessToken))
             {
@@ -74,19 +179,20 @@ namespace AppleTv
             }
             
             var config = Plugin.Instance.Configuration;
-            var channel = LibraryManager.GetItemList(new InternalItemsQuery()
+            var channelLibraryItem = LibraryManager.GetItemList(new InternalItemsQuery
             {
                 Name = config.ChannelName
             });
+            
             // ReSharper disable once ComplexConditionExpression
-            var ids = LibraryManager.GetInternalItemIds(new InternalItemsQuery()
+            var ids = LibraryManager.GetInternalItemIds(new InternalItemsQuery
             {
                 IncludeItemTypes = new[] {"Movie"}
             });
 
-            var libraryItems = LibraryManager.GetInternalItemIds(new InternalItemsQuery()
+            var libraryItems = LibraryManager.GetInternalItemIds(new InternalItemsQuery
             {
-                ParentIds = new[] {channel[0].InternalId}
+                ParentIds = new[] {channelLibraryItem[0].InternalId}
             }).ToList();
 
             if (!string.IsNullOrEmpty(Plugin.Instance.PluginConfiguration.Pin))
@@ -100,7 +206,7 @@ namespace AppleTv
 
              var mediaItems =
                 LibraryManager.GetItemList(
-                        new InternalItemsQuery()
+                        new InternalItemsQuery
                         {
                             IncludeItemTypes = new[] {nameof(Movie)},
                             IsVirtualItem = false,
@@ -132,7 +238,7 @@ namespace AppleTv
                     var embyMove = LibraryManager.GetItemById(movie.Id);
                     if (embyMove != null)
                     {
-                        Logger.Info($"Emby Movie {embyMove}");
+                        Logger.Info($"Emby Movie {embyMove} found!");
                            // if(string.IsNullOrEmpty(embyMove.Path)){
                                 var newMovie = new ChannelItemInfo
                                 {
@@ -156,7 +262,7 @@ namespace AppleTv
                 }
                 else
                 {
-                    //Logger.Debug($"Movie {movie.Name} not found");
+                    Logger.Debug($"Movie {movie.Name} not found");
                 }
             }
                 
@@ -202,7 +308,7 @@ namespace AppleTv
 
         public IEnumerable<ImageType> GetSupportedChannelImages()
         {
-            return new List<ImageType>() { ImageType.Primary, ImageType.Thumb };
+            return new List<ImageType> { ImageType.Primary, ImageType.Thumb };
         }
 
         public string Name => Plugin.Instance.PluginConfiguration.ChannelName;
