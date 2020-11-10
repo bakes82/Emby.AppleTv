@@ -7,11 +7,11 @@ https://trakt.tv/users/istoit/lists/apple-tv?sort=rank,asc
 
 ## Home Screen
 
-![](images\homescreen.png)
+![](AppleTv/images/homescreen.png)
 
 ## Channel View
 
-![](images\channelview.png)
+![](AppleTv/images/channelview.png)
 
 ## Channel Setup
-![](images\channelsetup.png)
+![](AppleTv/images/channelsetup.png)
